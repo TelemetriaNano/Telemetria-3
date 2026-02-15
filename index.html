@@ -3,1491 +3,449 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SCADA NANO v2.0 - Dashboard Industrial Negro</title>
+    <title>Dashboard SCADA - [NOMBRE_CLIENTE]</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        /* ===== ESTILO NEGRO INDUSTRIAL PROFUNDO ===== */
+        
+        :root {
+            /* ===== PERSONALIZACIÓN CLIENTE ===== */
+            --color-primario: #667eea;
+            --color-secundario: #764ba2;
+            --logo-url: url('logo.png'); /* Opcional */
+        }
+        
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--color-primario) 0%, var(--color-secundario) 100%);
             min-height: 100vh;
             padding: 20px;
-            background: #0a0a0a;          /* Negro muy oscuro */
-            color: #e0e0e0;               /* Gris claro principal */
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
-
-        /* ===== LOGIN SCREEN ===== */
-        #login-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            background: #0a0a0a;
-        }
-
-        .login-box {
-            padding: 50px;
-            border-radius: 20px;
-            text-align: center;
-            min-width: 400px;
-            background: rgba(20, 20, 20, 0.9);
-            backdrop-filter: blur(16px);
-            border: 1px solid #333;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-        }
-
-        .login-box h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            color: #00d4ff;               /* Cian neón */
-            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
-        }
-
-        .login-box p {
-            opacity: 0.8;
-            margin-bottom: 30px;
-            color: #aaa;
-        }
-
-        .login-box input {
-            width: 100%;
-            padding: 15px;
-            font-size: 1.1em;
-            border: 1px solid #444;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            text-align: center;
-            background: #1a1a1a;
-            color: #e0e0e0;
-            transition: all 0.3s;
-        }
-
-        .login-box input:focus {
-            outline: none;
-            border-color: #00d4ff;
-            box-shadow: 0 0 12px rgba(0, 212, 255, 0.4);
-        }
-
-        .login-box button {
-            width: 100%;
-            padding: 15px;
-            font-size: 1.2em;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            background: linear-gradient(135deg, #00d4ff 0%, #0077b6 100%);
-            color: white;
-            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
-            transition: all 0.3s;
-        }
-
-        .login-box button:hover {
-            box-shadow: 0 6px 25px rgba(0, 212, 255, 0.5);
-        }
-
-        .login-error {
-            color: #ff2d55;
-            margin-top: 15px;
-            font-weight: bold;
-            display: none;
-        }
-
-        /* ===== MAIN DASHBOARD ===== */
-        #dashboard {
-            display: none;
-        }
-
+        
         .header {
             text-align: center;
+            color: white;
             margin-bottom: 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
-
+        
         .header h1 {
             font-size: 2.5em;
-            margin-bottom: 5px;
-            color: #00d4ff;
-            text-shadow: 0 0 12px rgba(0, 212, 255, 0.4);
+            margin-bottom: 10px;
         }
-
-        .header .version {
-            font-size: 0.9em;
-            opacity: 0.8;
-            color: #aaa;
-        }
-
-        /* ===== STATUS BAR ===== */
+        
         .status-bar {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
             display: flex;
             justify-content: space-around;
-            flex-wrap: wrap;
-            gap: 15px;
             margin-bottom: 30px;
-            padding: 15px;
-            border-radius: 12px;
-            background: #111;
-            border: 1px solid #222;
-            backdrop-filter: blur(10px);
+            color: white;
         }
-
+        
         .status-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: #e0e0e0;
+            text-align: center;
         }
-
+        
         .status-indicator {
+            display: inline-block;
             width: 12px;
             height: 12px;
             border-radius: 50%;
-            animation: pulse 2s ease-in-out infinite;
+            margin-right: 8px;
         }
-
-        .status-indicator.connected { background: #00ff9d; box-shadow: 0 0 12px #00ff9d; }
-        .status-indicator.connecting { background: #ffd700; box-shadow: 0 0 12px #ffd700; }
-        .status-indicator.disconnected { background: #ff2d55; box-shadow: 0 0 12px #ff2d55; }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-
-        /* ===== SILENCE ALL BUTTON ===== */
-        .silence-all-btn {
-            padding: 12px 24px;
-            font-size: 16px;
-            font-weight: bold;
-            border: 2px solid #ff2d55;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #ff2d55 0%, #cc2444 100%);
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: none;
-        }
-
-        .silence-all-btn:hover {
-            box-shadow: 0 0 20px rgba(255, 45, 85, 0.8);
-        }
-
-        .silence-all-btn.visible {
-            display: block;
-        }
-
-        /* ===== CONTAINER ===== */
-        .container {
+        
+        .status-indicator.connected { background: #4CAF50; box-shadow: 0 0 10px #4CAF50; }
+        .status-indicator.disconnected { background: #DC143C; }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
             max-width: 1400px;
             margin: 0 auto;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
         }
-
-        /* ===== CARDS ===== */
+        
         .card {
-            border-radius: 20px;
+            background: white;
+            border-radius: 15px;
             padding: 25px;
-            background: #111;
-            border: 1px solid #222;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s;
         }
-
+        
         .card:hover {
-            border-color: #00d4ff;
-            box-shadow: 0 0 20px rgba(0, 212, 255, 0.25);
+            transform: translateY(-5px);
         }
-
-        .card.alarm-active {
-            animation: alarmPulse 2s ease-in-out infinite;
-            border-color: #ff2d55;
-            background: rgba(255, 45, 85, 0.12);
-            box-shadow: 0 0 30px rgba(255, 45, 85, 0.4);
-        }
-
-        @keyframes alarmPulse {
-            0%, 100% { box-shadow: 0 0 20px rgba(255, 45, 85, 0.4); }
-            50% { box-shadow: 0 0 45px rgba(255, 45, 85, 0.7); }
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-
+        
         .card-title {
-            font-size: 0.9em;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-weight: 600;
-            color: #aaa;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            color: #333;
+            font-weight: bold;
         }
-
-        .config-btn {
-            background: rgba(0, 212, 255, 0.2);
-            border: 1px solid rgba(0, 212, 255, 0.4);
-            color: #e0e0e0;
-            padding: 6px 12px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
-        }
-
-        .config-btn:hover {
-            background: rgba(0, 212, 255, 0.4);
-            box-shadow: 0 0 12px rgba(0, 212, 255, 0.6);
-        }
-
-        /* ===== ANALOG DISPLAY WITH VERTICAL BAR ===== */
-        .analog-display {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            margin: 15px 0;
-        }
-
-        .value-container {
-            flex: 0 1 auto;
-            text-align: right;
-        }
-
-        .card-value {
+        
+        .sensor-value {
             font-size: 3em;
             font-weight: bold;
-            margin: 0;
-            color: #00ff9d;
-        }
-
-        .alarm-indicators {
-            display: flex;
-            gap: 8px;
-            margin-top: 5px;
-            justify-content: flex-end;
-        }
-
-        .alarm-badge {
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: bold;
-            display: none;
-        }
-
-        .alarm-badge.high {
-            background: #ff2d55;
-            color: white;
-        }
-
-        .alarm-badge.low {
-            background: #ffd700;
-            color: #000;
-        }
-
-        /* ===== VERTICAL PROGRESS BAR ===== */
-        .vertical-bar-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 5px;
-            flex-shrink: 0;
-        }
-
-        .bar-label {
-            font-size: 11px;
-            opacity: 0.7;
-            color: #aaa;
-        }
-
-        .vertical-bar {
-            width: 24px;
-            height: 150px;
-            background: #0f0f0f;
-            border-radius: 12px;
-            position: relative;
-            overflow: hidden;
-            border: 1px solid #333;
-        }
-
-        .bar-fill {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            transition: all 0.5s ease;
-            border-radius: 0 0 10px 10px;
-        }
-
-        .bar-fill.green {
-            background: linear-gradient(to top, #00aa00, #00ff9d);
-        }
-
-        .bar-fill.yellow {
-            background: linear-gradient(to top, #ffaa00, #ffd700);
-        }
-
-        .bar-markers {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-
-        .marker {
-            position: absolute;
-            left: -8px;
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-top: 12px solid #ffd700;
-            filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.8));
-            cursor: help;
-        }
-
-        .marker.high { transform: translateY(-6px); }
-        .marker.low { transform: translateY(-6px); }
-
-        .marker::after {
-            content: attr(data-value);
-            position: absolute;
-            left: 20px;
-            top: -8px;
-            background: rgba(0,0,0,0.9);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            white-space: nowrap;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s;
-        }
-
-        .marker:hover::after { opacity: 1; }
-
-        .card-subtitle {
-            font-size: 0.85em;
-            color: #888;
-        }
-
-        /* ===== ACK BUTTON ===== */
-        .ack-btn {
-            width: 100%;
-            padding: 10px;
-            margin-top: 10px;
-            background: #ff2d55;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            display: none;
-            transition: all 0.3s;
-        }
-
-        .ack-btn.visible {
-            display: block;
-            animation: ackPulse 1s ease-in-out infinite;
-        }
-
-        @keyframes ackPulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-
-        .ack-btn:hover {
-            box-shadow: 0 0 16px rgba(255, 45, 85, 0.8);
-        }
-
-        /* ===== ESTADOS DE COLOR ===== */
-        .status-normal { color: #00ff9d; text-shadow: 0 0 8px rgba(0, 255, 157, 0.4); }
-        .status-warning { color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.4); }
-        .status-alarm { color: #ff2d55; text-shadow: 0 0 8px rgba(255, 45, 85, 0.4); }
-
-        /* ===== CONTROLES ===== */
-        .control-card {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .btn {
-            padding: 15px 30px;
-            font-size: 1em;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            font-weight: 600;
-        }
-
-        .btn:hover {
-            box-shadow: 0 0 16px rgba(0, 212, 255, 0.5);
-        }
-
-        .btn:active {
-            box-shadow: inset 0 2px 6px rgba(0,0,0,0.5);
-        }
-
-        .btn.on {
-            background: linear-gradient(135deg, #00ff9d 0%, #00aa00 100%);
-            color: white;
-            box-shadow: 0 0 16px rgba(0, 255, 157, 0.5);
-        }
-
-        .btn.off {
-            background: linear-gradient(135deg, #444 0%, #222 100%);
-            color: white;
-        }
-
-        /* ===== SLIDER ===== */
-        .slider-container {
-            margin-top: 10px;
-        }
-
-        .slider {
-            width: 100%;
-            height: 8px;
-            border-radius: 5px;
-            outline: none;
-            -webkit-appearance: none;
-            background: #333;
-            transition: all 0.3s;
-        }
-
-        .slider:hover {
-            box-shadow: 0 0 12px rgba(0, 212, 255, 0.4);
-        }
-
-        .slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 25px;
-            height: 25px;
-            border-radius: 50%;
-            background: #00d4ff;
-            cursor: pointer;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-            transition: transform 0.2s ease;
-        }
-
-        .slider::-webkit-slider-thumb:hover {
-            transform: scale(1.1);
-            box-shadow: 0 0 16px rgba(0, 212, 255, 0.8);
-        }
-
-        .value-display {
+            color: var(--color-primario);
             text-align: center;
-            font-size: 1.5em;
-            font-weight: bold;
-            margin-top: 10px;
-            color: #00ff9d;
+            margin: 20px 0;
         }
-
-        /* ===== CONFIG MODAL ===== */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
+        
+        .gauge {
             width: 100%;
+            height: 30px;
+            background: #eee;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .gauge-fill {
             height: 100%;
-            background: rgba(0,0,0,0.9);
-            backdrop-filter: blur(8px);
-            z-index: 10000;
-            align-items: center;
-            justify-content: center;
+            background: linear-gradient(90deg, var(--color-primario), var(--color-secundario));
+            transition: width 0.5s ease;
+            border-radius: 15px;
         }
-
-        .modal.visible {
-            display: flex;
-        }
-
-        .modal-content {
-            min-width: 450px;
-            max-width: 500px;
-            border-radius: 20px;
-            padding: 30px;
-            background: rgba(20, 20, 20, 0.95);
-            border: 1px solid #333;
-            backdrop-filter: blur(20px);
-            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-            color: #e0e0e0;
-        }
-
-        .modal-header {
-            font-size: 1.5em;
-            font-weight: bold;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #333;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-label {
-            display: block;
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            opacity: 0.9;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #444;
-            border-radius: 10px;
-            font-size: 16px;
-            background: #1a1a1a;
-            color: #e0e0e0;
-            transition: all 0.3s;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: #00d4ff;
-            box-shadow: 0 0 12px rgba(0, 212, 255, 0.3);
-        }
-
-        /* Switch Toggle */
-        .switch-group {
+        
+        .gauge-markers {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            background: rgba(255,255,255,0.05);
+            margin-top: 5px;
+            font-size: 0.9em;
+            color: #666;
         }
-
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 30px;
-        }
-
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .switch-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #444;
-            transition: 0.4s;
-            border-radius: 30px;
-        }
-
-        .switch-slider:before {
-            position: absolute;
-            content: "";
-            height: 22px;
-            width: 22px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: 0.4s;
-            border-radius: 50%;
-        }
-
-        input:checked + .switch-slider {
-            background-color: #00d4ff;
-        }
-
-        input:checked + .switch-slider:before {
-            transform: translateX(30px);
-        }
-
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 25px;
-        }
-
-        .modal-btn {
-            flex: 1;
-            padding: 12px;
+        
+        .control-button {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1em;
+            font-weight: bold;
             border: none;
             border-radius: 10px;
-            font-size: 15px;
-            font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
         }
-
-        .modal-btn.save {
-            background: linear-gradient(135deg, #00ff9d, #00aa00);
+        
+        .control-button.off {
+            background: #ddd;
+            color: #666;
+        }
+        
+        .control-button.on {
+            background: var(--color-primario);
             color: white;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
-
-        .modal-btn.cancel {
-            background: #444;
-            color: white;
+        
+        .control-button:hover {
+            transform: scale(1.05);
         }
-
-        .modal-btn.reset {
-            background: #ff2d55;
-            color: white;
-        }
-
-        .modal-btn:hover {
-            box-shadow: 0 0 16px rgba(0, 212, 255, 0.5);
-        }
-
-        /* ===== EVENT LOG ===== */
-        #event-log-popup .event-item {
-            padding: 12px 15px;
-            margin-bottom: 10px;
-            border-radius: 8px;
-            font-size: 0.95em;
-            border-left: 4px solid;
-            background: #1a1a1a;
-            transition: all 0.3s;
-        }
-
-        #event-log-popup .event-item:hover {
-            background: rgba(0, 212, 255, 0.1);
-        }
-
-        #event-log-popup .event-item.alarm { border-left-color: #ff2d55; }
-        #event-log-popup .event-item.control { border-left-color: #00ff9d; }
-        #event-log-popup .event-item.info { border-left-color: #00d4ff; }
-
-        #event-log-popup .event-timestamp {
-            opacity: 0.7;
-            margin-right: 12px;
+        
+        .alarm-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
             font-weight: bold;
+            margin-top: 10px;
+        }
+        
+        .alarm-badge.normal {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .alarm-badge.warning {
+            background: #FFA500;
+            color: white;
+        }
+        
+        .alarm-badge.critical {
+            background: #DC143C;
+            color: white;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .timestamp {
+            text-align: center;
+            color: rgba(255,255,255,0.7);
+            margin-top: 20px;
             font-size: 0.9em;
         }
-
-        .logout-btn {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 10px 20px;
-            border-radius: 10px;
-            cursor: pointer;
-            background: #ff2d55;
-            color: white;
-            border: 2px solid #cc2444;
-            font-weight: 600;
-            z-index: 100;
-            transition: all 0.3s;
-        }
-
-        .logout-btn:hover {
-            box-shadow: 0 0 20px rgba(255, 45, 85, 0.6);
-        }
-
+        
         @media (max-width: 768px) {
-            .login-box { min-width: 300px; padding: 30px; }
-            .header { flex-direction: column; gap: 15px; }
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
             .header h1 { font-size: 1.8em; }
-            .card-value { font-size: 3.5em; }
-            .container { grid-template-columns: 1fr; }
-            .modal-content { min-width: 90%; }
         }
     </style>
 </head>
 <body>
-    <!-- ===== PANTALLA DE LOGIN ===== -->
-    <div id="login-screen">
-        <div class="login-box">
-            <h1>🔐 SCADA NANO</h1>
-            <p>Sistema de Telemetría Industrial</p>
-            <input type="password" id="password-input" placeholder="Ingrese contraseña"
-                   onkeypress="if(event.key==='Enter') login()">
-            <button onclick="login()">INGRESAR</button>
-            <div class="login-error" id="login-error">❌ Contraseña incorrecta</div>
+    <div class="header">
+        <h1>🏭 Dashboard SCADA</h1>
+        <p id="cliente-nombre">[NOMBRE_CLIENTE]</p>
+    </div>
+
+    <div class="status-bar">
+        <div class="status-item">
+            <span class="status-indicator" id="mqtt-indicator"></span>
+            <span id="mqtt-status">Conectando...</span>
+        </div>
+        <div class="status-item">
+            <span>Dispositivo: <strong id="device-id">---</strong></span>
+        </div>
+        <div class="status-item">
+            <span>Última actualización: <strong id="last-update">---</strong></span>
         </div>
     </div>
 
-    <!-- ===== DASHBOARD PRINCIPAL ===== -->
-    <div id="dashboard">
-        <button class="logout-btn" onclick="logout()">🚪 Cerrar Sesión</button>
-       
-        <div class="header">
-            <div class="header-title">
-                <h1>🏭 SCADA NANO</h1>
-                <div class="version">v2.0 - Sistema Industrial con Alarmas Configurables</div>
+    <div class="dashboard">
+        <!-- Sensor 1: Nivel -->
+        <div class="card">
+            <div class="card-title">💧 Nivel de Tanque</div>
+            <div class="sensor-value" id="nivel-value">--</div>
+            <div class="gauge">
+                <div class="gauge-fill" id="nivel-gauge" style="width: 0%"></div>
+            </div>
+            <div class="gauge-markers">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
+            </div>
+            <div style="text-align: center;">
+                <span class="alarm-badge normal" id="nivel-alarm">Normal</span>
             </div>
         </div>
 
-        <div class="status-bar">
-            <div class="status-item">
-                <div class="status-indicator connecting" id="mqtt-indicator"></div>
-                <span id="mqtt-status">MQTT: Conectando...</span>
+        <!-- Sensor 2: Presión -->
+        <div class="card">
+            <div class="card-title">⚡ Presión del Sistema</div>
+            <div class="sensor-value" id="presion-value">--</div>
+            <div class="gauge">
+                <div class="gauge-fill" id="presion-gauge" style="width: 0%"></div>
             </div>
-            <div class="status-item">
-                <span>🕐 Uptime: <strong id="uptime">00:00:00</strong></span>
+            <div class="gauge-markers">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
             </div>
-            <div class="status-item">
-                <span>💾 Memoria: <strong id="memory">0 KB</strong></span>
-            </div>
-            <div class="status-item">
-                <button class="silence-all-btn" id="silence-all" onclick="silenceAllAlarms()">
-                    🔇 SILENCIAR TODAS
-                </button>
+            <div style="text-align: center;">
+                <span class="alarm-badge normal" id="presion-alarm">Normal</span>
             </div>
         </div>
 
-        <div class="container">
-            <!-- NIVEL TANQUE (ANALÓGICO) -->
-            <div class="card" id="card-nivel">
-                <div class="card-header">
-                    <div class="card-title">💧 Nivel de Tanque</div>
-                    <button class="config-btn" onclick="openConfig('nivel')">⚙️</button>
-                </div>
-               
-                <div class="analog-display">
-                    <div class="value-container">
-                        <div class="card-value" id="nivel-value">0%</div>
-                        <div class="alarm-indicators">
-                            <span class="alarm-badge high" id="nivel-badge-high">H</span>
-                            <span class="alarm-badge low" id="nivel-badge-low">L</span>
-                        </div>
-                        <div class="card-subtitle">Potenciómetro 1</div>
-                    </div>
-                   
-                    <div class="vertical-bar-container">
-                        <div class="bar-label">100%</div>
-                        <div class="vertical-bar">
-                            <div class="bar-fill green" id="nivel-bar" style="height: 0%"></div>
-                            <div class="bar-markers" id="nivel-markers"></div>
-                        </div>
-                        <div class="bar-label">0%</div>
-                    </div>
-                </div>
-               
-                <button class="ack-btn" id="nivel-ack" onclick="acknowledgeAlarm('nivel')">
-                    🔔 RECONOCER ALARMA
-                </button>
-            </div>
+        <!-- Control: Bomba 1 -->
+        <div class="card">
+            <div class="card-title">💚 Bomba Principal</div>
+            <button class="control-button off" id="bomba1-btn" onclick="toggleBomba1()">
+                <span id="bomba1-text">ENCENDER</span>
+            </button>
+        </div>
 
-            <!-- PRESIÓN (ANALÓGICO) -->
-            <div class="card" id="card-presion">
-                <div class="card-header">
-                    <div class="card-title">⚙️ Presión del Sistema</div>
-                    <button class="config-btn" onclick="openConfig('presion')">⚙️</button>
-                </div>
-               
-                <div class="analog-display">
-                    <div class="value-container">
-                        <div class="card-value" id="presion-value">0%</div>
-                        <div class="alarm-indicators">
-                            <span class="alarm-badge high" id="presion-badge-high">H</span>
-                            <span class="alarm-badge low" id="presion-badge-low">L</span>
-                        </div>
-                        <div class="card-subtitle">Potenciómetro 2</div>
-                    </div>
-                   
-                    <div class="vertical-bar-container">
-                        <div class="bar-label">100%</div>
-                        <div class="vertical-bar">
-                            <div class="bar-fill green" id="presion-bar" style="height: 0%"></div>
-                            <div class="bar-markers" id="presion-markers"></div>
-                        </div>
-                        <div class="bar-label">0%</div>
-                    </div>
-                </div>
-               
-                <button class="ack-btn" id="presion-ack" onclick="acknowledgeAlarm('presion')">
-                    🔔 RECONOCER ALARMA
-                </button>
-            </div>
+        <!-- Control: Bomba 2 -->
+        <div class="card">
+            <div class="card-title">💙 Bomba Secundaria</div>
+            <button class="control-button off" id="bomba2-btn" onclick="toggleBomba2()">
+                <span id="bomba2-text">ENCENDER</span>
+            </button>
+        </div>
 
-            <!-- SENSORES DIGITALES -->
-            <div class="card">
-                <div class="card-title">🚪 Sensor de Puerta</div>
-                <div class="card-value" id="puerta-value">CERRADA</div>
-                <div class="card-subtitle">Switch 1</div>
-            </div>
-            <div class="card">
-                <div class="card-title">📏 Sensor de Nivel</div>
-                <div class="card-value" id="sensor-nivel-value">BAJO</div>
-                <div class="card-subtitle">Switch 2</div>
-            </div>
+        <!-- Sensor Digital: Puerta -->
+        <div class="card">
+            <div class="card-title">🚪 Estado de Puerta</div>
+            <div class="sensor-value" id="puerta-value" style="font-size: 2em;">---</div>
+        </div>
 
-            <!-- ALARMAS -->
-            <div class="card">
-                <div class="card-title">🔔 Sistema de Alarmas</div>
-                <div class="card-value" id="alarm-count">0</div>
-                <div class="card-subtitle" id="alarm-status">Sistema Normal</div>
-            </div>
-
-            <!-- CONTROL SERVO -->
-            <div class="card control-card">
-                <div class="card-title">🎛️ Control de Válvula</div>
-                <div class="slider-container">
-                    <input type="range" min="0" max="180" value="0" class="slider" id="servo-slider">
-                    <div class="value-display" id="servo-display">0°</div>
-                </div>
-            </div>
-
-            <!-- CONTROL BOMBAS -->
-            <div class="card control-card">
-                <div class="card-title">💚 Bomba 1 (Verde)</div>
-                <button class="btn off" id="bomba1-btn" onclick="toggleBomba1()">
-                    <span id="bomba1-text">ENCENDER</span>
-                </button>
-            </div>
-            <div class="card control-card">
-                <div class="card-title">💙 Bomba 2 (Azul)</div>
-                <button class="btn off" id="bomba2-btn" onclick="toggleBomba2()">
-                    <span id="bomba2-text">ENCENDER</span>
-                </button>
-            </div>
-
-            <!-- BOTÓN PARA ABRIR LOG DE EVENTOS -->
-            <div class="card control-card">
-                <div class="card-title">📋 Registro de Eventos</div>
-                <button class="btn off" onclick="openEventLog()" style="background: linear-gradient(135deg, #00d4ff 0%, #0077b6 100%);">
-                    <span>📋 VER ÚLTIMOS 30 EVENTOS</span>
-                </button>
-            </div>
+        <!-- Sensor Digital: Nivel -->
+        <div class="card">
+            <div class="card-title">📏 Sensor de Nivel</div>
+            <div class="sensor-value" id="sensor-nivel-value" style="font-size: 2em;">---</div>
         </div>
     </div>
 
-    <!-- ===== EVENT LOG MODAL ===== -->
-    <div class="modal" id="event-log-modal">
-        <div class="modal-content" style="max-width: 700px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;">
-            <div class="modal-header">📋 Registro de Eventos (Últimos 30)</div>
-           
-            <div style="flex: 1; overflow-y: auto; padding: 10px 0;">
-                <div id="event-log-popup"></div>
-            </div>
-           
-            <div class="modal-buttons" style="margin-top: 15px;">
-                <button class="modal-btn cancel" onclick="closeEventLog()" style="flex: 1;">❌ Cerrar</button>
-                <button class="modal-btn save" onclick="clearEventLog()" style="flex: 1; background: #ff2d55;">🗑️ Limpiar Log</button>
-            </div>
-        </div>
+    <div class="timestamp">
+        Powered by SCADA Nano | Dashboard v1.0
     </div>
 
-    <!-- ===== CONFIG MODAL ===== -->
-    <div class="modal" id="config-modal">
-        <div class="modal-content">
-            <div class="modal-header" id="modal-title">Configuración de Alarmas</div>
-           
-            <div class="form-group">
-                <label class="form-label">Set Point Alto (%)</label>
-                <input type="number" class="form-input" id="config-high" min="0" max="100" value="80">
-            </div>
-           
-            <div class="form-group">
-                <label class="form-label">Set Point Bajo (%)</label>
-                <input type="number" class="form-input" id="config-low" min="0" max="100" value="20">
-            </div>
-           
-            <div class="switch-group">
-                <label class="form-label" style="margin: 0;">Alarmas Activadas</label>
-                <label class="switch">
-                    <input type="checkbox" id="config-alarm-enabled" checked>
-                    <span class="switch-slider"></span>
-                </label>
-            </div>
-           
-            <div class="switch-group">
-                <label class="form-label" style="margin: 0;">Beep Sonoro</label>
-                <label class="switch">
-                    <input type="checkbox" id="config-beep-enabled" checked>
-                    <span class="switch-slider"></span>
-                </label>
-            </div>
-           
-            <div class="modal-buttons">
-                <button class="modal-btn save" onclick="saveConfig()">💾 Guardar</button>
-                <button class="modal-btn cancel" onclick="closeConfig()">❌ Cancelar</button>
-                <button class="modal-btn reset" onclick="resetConfig()">🔄 Reset</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== JAVASCRIPT ORIGINAL (SIN CAMBIOS) ===== -->
     <script>
-        // ===== CONFIGURACIÓN =====
-        const CORRECT_PASSWORD = "Nano01";
-        const broker = "wss://430b579b966d4e73a269ce0c803564a7.s1.eu.hivemq.cloud:8884/mqtt";
-        const options = {
-            clientId: 'Dashboard_' + Math.random().toString(16).substr(2, 8),
-            username: 'Telemetria-Nano',
-            password: 'Telemetria01',
-            clean: true,
-            reconnectPeriod: 5000
+        // ===== CONFIGURACIÓN CLIENTE =====
+        const CONFIG = {
+            CLIENTE_NOMBRE: '[NOMBRE_CLIENTE]',
+            DEVICE_ID: 'ESP32_001', // Cambiar por el ID del cliente
+            
+            MQTT_BROKER: 'wss://broker.hivemq.com:8884/mqtt',
+            MQTT_USER: '',  // Opcional
+            MQTT_PASS: '',  // Opcional
+            
+            ALARMAS: {
+                nivel: { high: 80, low: 20 },
+                presion: { high: 80, low: 20 }
+            },
+            
+            // Licencia (opcional - para validar en el futuro)
+            LICENSE_KEY: '',
+            LICENSE_EXPIRE: null
         };
+
         // ===== VARIABLES GLOBALES =====
         let client;
         let bomba1State = false;
         let bomba2State = false;
-        let servoAngle = 0;
-        let startTime = Date.now();
-        let eventLog = [];
-        const MAX_EVENTS = 30;
-       
-        // Audio Context para beeps
-        let audioContext;
-        let beepIntervals = {};
-       
-        // Estado de alarmas
-        let alarmStates = {
-            nivel: { high: false, low: false, acknowledged: false },
-            presion: { high: false, low: false, acknowledged: false }
-        };
-       
-        // Configuración de alarmas (defaults)
-        let alarmConfigs = {
-            nivel: {
-                high: 80,
-                low: 20,
-                alarmEnabled: true,
-                beepEnabled: true
-            },
-            presion: {
-                high: 80,
-                low: 20,
-                alarmEnabled: true,
-                beepEnabled: true
-            }
-        };
-       
-        // Cargar configuración desde localStorage
-        function loadConfigs() {
-            const saved = localStorage.getItem('scada_alarm_configs');
-            if (saved) {
-                alarmConfigs = JSON.parse(saved);
-            }
-            updateAllMarkers();
-        }
-       
-        // Guardar configuración en localStorage
-        function saveConfigs() {
-            localStorage.setItem('scada_alarm_configs', JSON.stringify(alarmConfigs));
-        }
-       
-        let currentConfigInstrument = null;
-       
-        // ===== BEEP SONORO =====
-        function initAudio() {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-        }
-       
-        function playBeep() {
-            if (!audioContext) return;
-           
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-           
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-           
-            oscillator.frequency.value = 800;
-            oscillator.type = 'sine';
-           
-            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-           
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.3);
-        }
-       
-        function startBeep(instrument) {
-            if (beepIntervals[instrument]) return; // Ya está sonando
-           
-            playBeep(); // Beep inmediato
-            beepIntervals[instrument] = setInterval(() => {
-                playBeep();
-            }, 10000); // Cada 10 segundos
-        }
-       
-        function stopBeep(instrument) {
-            if (beepIntervals[instrument]) {
-                clearInterval(beepIntervals[instrument]);
-                delete beepIntervals[instrument];
-            }
-        }
-       
-        // ===== ALARM MANAGEMENT =====
-        function checkAlarm(instrument, value) {
-            const config = alarmConfigs[instrument];
-            const state = alarmStates[instrument];
-           
-            if (!config.alarmEnabled) {
-                if (state.high || state.low) {
-                    state.high = false;
-                    state.low = false;
-                    state.acknowledged = false;
-                    stopBeep(instrument);
-                    updateAlarmUI(instrument);
-                }
-                return;
-            }
-           
-            let alarmTriggered = false;
-           
-            // Check High Alarm
-            if (value >= config.high && !state.high) {
-                state.high = true;
-                state.acknowledged = false;
-                alarmTriggered = true;
-                addEvent(`🚨 ALARMA ALTA - ${instrument.toUpperCase()}: ${value}% (>= ${config.high}%)`, 'alarm');
-            } else if (value < config.high - 2 && state.high) {
-                state.high = false;
-                addEvent(`✓ Alarma alta normalizada - ${instrument.toUpperCase()}`, 'info');
-            }
-           
-            // Check Low Alarm
-            if (value <= config.low && !state.low) {
-                state.low = true;
-                state.acknowledged = false;
-                alarmTriggered = true;
-                addEvent(`⚠ ALARMA BAJA - ${instrument.toUpperCase()}: ${value}% (<= ${config.low}%)`, 'alarm');
-            } else if (value > config.low + 2 && state.low) {
-                state.low = false;
-                addEvent(`✓ Alarma baja normalizada - ${instrument.toUpperCase()}`, 'info');
-            }
-           
-            if (alarmTriggered && config.beepEnabled && !state.acknowledged) {
-                initAudio();
-                startBeep(instrument);
-            }
-           
-            if (!state.high && !state.low) {
-                stopBeep(instrument);
-                state.acknowledged = false;
-            }
-           
-            updateAlarmUI(instrument);
-        }
-       
-        function updateAlarmUI(instrument) {
-            const state = alarmStates[instrument];
-            const card = document.getElementById(`card-${instrument}`);
-            const ackBtn = document.getElementById(`${instrument}-ack`);
-            const badgeHigh = document.getElementById(`${instrument}-badge-high`);
-            const badgeLow = document.getElementById(`${instrument}-badge-low`);
-           
-            badgeHigh.style.display = state.high ? 'inline-block' : 'none';
-            badgeLow.style.display = state.low ? 'inline-block' : 'none';
-           
-            if (state.high || state.low) {
-                card.classList.add('alarm-active');
-                if (!state.acknowledged) {
-                    ackBtn.classList.add('visible');
-                } else {
-                    ackBtn.classList.remove('visible');
-                }
-            } else {
-                card.classList.remove('alarm-active');
-                ackBtn.classList.remove('visible');
-            }
-           
-            updateSilenceAllButton();
-        }
-       
-        function updateSilenceAllButton() {
-            const silenceBtn = document.getElementById('silence-all');
-            let hasActiveAlarms = false;
-           
-            for (let inst in alarmStates) {
-                if ((alarmStates[inst].high || alarmStates[inst].low) && !alarmStates[inst].acknowledged) {
-                    hasActiveAlarms = true;
-                    break;
-                }
-            }
-           
-            if (hasActiveAlarms) {
-                silenceBtn.classList.add('visible');
-            } else {
-                silenceBtn.classList.remove('visible');
-            }
-        }
-       
-        function acknowledgeAlarm(instrument) {
-            const state = alarmStates[instrument];
-            state.acknowledged = true;
-            stopBeep(instrument);
-            updateAlarmUI(instrument);
-            addEvent(`✓ Alarma reconocida - ${instrument.toUpperCase()}`, 'control');
-        }
-       
-        function silenceAllAlarms() {
-            for (let inst in alarmStates) {
-                if (alarmStates[inst].high || alarmStates[inst].low) {
-                    acknowledgeAlarm(inst);
-                }
-            }
-            addEvent('🔇 Todas las alarmas silenciadas', 'control');
-        }
-       
-        // ===== CONFIG MODAL =====
-        function openConfig(instrument) {
-            currentConfigInstrument = instrument;
-            const config = alarmConfigs[instrument];
-           
-            document.getElementById('modal-title').textContent =
-                `Configuración - ${instrument.toUpperCase()}`;
-            document.getElementById('config-high').value = config.high;
-            document.getElementById('config-low').value = config.low;
-            document.getElementById('config-alarm-enabled').checked = config.alarmEnabled;
-            document.getElementById('config-beep-enabled').checked = config.beepEnabled;
-           
-            document.getElementById('config-modal').classList.add('visible');
-        }
-       
-        function closeConfig() {
-            document.getElementById('config-modal').classList.remove('visible');
-            currentConfigInstrument = null;
-        }
-       
-        function saveConfig() {
-            if (!currentConfigInstrument) return;
-           
-            const high = parseInt(document.getElementById('config-high').value);
-            const low = parseInt(document.getElementById('config-low').value);
-           
-            if (high <= low) {
-                alert('⚠️ El Set Point Alto debe ser mayor que el Bajo');
-                return;
-            }
-           
-            alarmConfigs[currentConfigInstrument] = {
-                high: high,
-                low: low,
-                alarmEnabled: document.getElementById('config-alarm-enabled').checked,
-                beepEnabled: document.getElementById('config-beep-enabled').checked
-            };
-           
-            saveConfigs();
-            updateMarkers(currentConfigInstrument);
-            addEvent(`⚙️ Configuración guardada - ${currentConfigInstrument.toUpperCase()}`, 'control');
-            closeConfig();
-        }
-       
-        function resetConfig() {
-            if (!currentConfigInstrument) return;
-           
-            if (confirm('¿Restaurar configuración por defecto?')) {
-                alarmConfigs[currentConfigInstrument] = {
-                    high: 80,
-                    low: 20,
-                    alarmEnabled: true,
-                    beepEnabled: true
-                };
-                saveConfigs();
-                openConfig(currentConfigInstrument);
-                updateMarkers(currentConfigInstrument);
-                addEvent(`🔄 Configuración restaurada - ${currentConfigInstrument.toUpperCase()}`, 'control');
-            }
-        }
-       
-        // ===== VERTICAL BAR =====
-        function updateBar(instrument, value) {
-            const bar = document.getElementById(`${instrument}-bar`);
-            const config = alarmConfigs[instrument];
-           
-            bar.style.height = value + '%';
-           
-            if (value >= config.high || value <= config.low) {
-                bar.className = 'bar-fill yellow';
-            } else {
-                bar.className = 'bar-fill green';
-            }
-        }
-       
-        function updateMarkers(instrument) {
-            const container = document.getElementById(`${instrument}-markers`);
-            const config = alarmConfigs[instrument];
-           
-            container.innerHTML = '';
-           
-            const highMarker = document.createElement('div');
-            highMarker.className = 'marker high';
-            highMarker.style.bottom = config.high + '%';
-            highMarker.setAttribute('data-value', `H: ${config.high}%`);
-            container.appendChild(highMarker);
-           
-            const lowMarker = document.createElement('div');
-            lowMarker.className = 'marker low';
-            lowMarker.style.bottom = config.low + '%';
-            lowMarker.setAttribute('data-value', `L: ${config.low}%`);
-            container.appendChild(lowMarker);
-        }
-       
-        function updateAllMarkers() {
-            updateMarkers('nivel');
-            updateMarkers('presion');
-        }
-       
-        // ===== EVENT LOG =====
-        function addEvent(message, type = 'info') {
-            const timestamp = new Date().toLocaleTimeString();
-            const event = { timestamp, message, type };
-           
-            eventLog.unshift(event);
-            if (eventLog.length > MAX_EVENTS) {
-                eventLog.pop();
-            }
-           
-            updateEventLogDisplay();
-        }
-        function updateEventLogDisplay() {
-            const container = document.getElementById('event-log-popup');
-            if (!container) return;
-           
-            if (eventLog.length === 0) {
-                container.innerHTML = '<div style="text-align: center; padding: 30px; opacity: 0.6;">No hay eventos registrados</div>';
-                return;
-            }
-           
-            container.innerHTML = eventLog.map(event => `
-                <div class="event-item ${event.type}">
-                    <span class="event-timestamp">[${event.timestamp}]</span>
-                    ${event.message}
-                </div>
-            `).join('');
-        }
-       
-        function openEventLog() {
-            document.getElementById('event-log-modal').classList.add('visible');
-            updateEventLogDisplay();
-        }
-       
-        function closeEventLog() {
-            document.getElementById('event-log-modal').classList.remove('visible');
-        }
-       
-        function clearEventLog() {
-            if (confirm('¿Estás seguro de que quieres borrar todos los eventos?')) {
-                eventLog = [];
-                updateEventLogDisplay();
-                addEvent('🗑️ Registro de eventos limpiado', 'info');
-            }
-        }
 
-        // ===== LOGIN =====
-        function login() {
-            const password = document.getElementById('password-input').value;
-           
-            if (password === CORRECT_PASSWORD) {
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('dashboard').style.display = 'block';
-                loadConfigs();
-                connectMQTT();
-                addEvent('Dashboard iniciado correctamente', 'info');
-            } else {
-                document.getElementById('login-error').style.display = 'block';
-                document.getElementById('password-input').value = '';
-                document.getElementById('password-input').focus();
-               
-                setTimeout(() => {
-                    document.getElementById('login-error').style.display = 'none';
-                }, 3000);
-            }
-        }
-        function logout() {
-            if (confirm('¿Confirmar cierre de sesión?')) {
-                if (client) client.end();
-                for (let inst in beepIntervals) {
-                    stopBeep(inst);
-                }
-                document.getElementById('dashboard').style.display = 'none';
-                document.getElementById('login-screen').style.display = 'flex';
-                document.getElementById('password-input').value = '';
-                eventLog = [];
-            }
-        }
-
-        // ===== UTILIDADES =====
-        function updateIndicator(id, status) {
-            const indicator = document.getElementById(id);
-            indicator.className = 'status-indicator ' + status;
-        }
-        function updateBomba1UI(state) {
-            bomba1State = state;
-            const btn = document.getElementById('bomba1-btn');
-            const text = document.getElementById('bomba1-text');
-           
-            if (state) {
-                btn.className = 'btn on';
-                text.textContent = 'APAGAR';
-            } else {
-                btn.className = 'btn off';
-                text.textContent = 'ENCENDER';
-            }
-        }
-        function updateBomba2UI(state) {
-            bomba2State = state;
-            const btn = document.getElementById('bomba2-btn');
-            const text = document.getElementById('bomba2-text');
-           
-            if (state) {
-                btn.className = 'btn on';
-                text.textContent = 'APAGAR';
-            } else {
-                btn.className = 'btn off';
-                text.textContent = 'ENCENDER';
-            }
-        }
-        function updateServoUI(angle) {
-            servoAngle = angle;
-            document.getElementById('servo-slider').value = angle;
-            document.getElementById('servo-display').textContent = angle + '°';
-        }
-
-        // ===== CONTROLES =====
-        function toggleBomba1() {
-            bomba1State = !bomba1State;
-            client.publish('esp32/control/bomba1', bomba1State ? '1' : '0');
-            updateBomba1UI(bomba1State);
-            addEvent(`Bomba 1 ${bomba1State ? 'ENCENDIDA' : 'APAGADA'}`, 'control');
-        }
-        function toggleBomba2() {
-            bomba2State = !bomba2State;
-            client.publish('esp32/control/bomba2', bomba2State ? '1' : '0');
-            updateBomba2UI(bomba2State);
-            addEvent(`Bomba 2 ${bomba2State ? 'ENCENDIDA' : 'APAGADA'}`, 'control');
-        }
-
-        const slider = document.getElementById('servo-slider');
-       
-        slider.addEventListener('input', (e) => {
-            document.getElementById('servo-display').textContent = e.target.value + '°';
-        });
-       
-        slider.addEventListener('change', (e) => {
-            const angle = e.target.value;
-            servoAngle = angle;
-            client.publish('esp32/control/valvula', angle.toString());
-            addEvent(`Válvula ajustada a ${angle}°`, 'control');
-        });
+        // ===== INICIALIZAR =====
+        document.getElementById('cliente-nombre').textContent = CONFIG.CLIENTE_NOMBRE;
+        document.getElementById('device-id').textContent = CONFIG.DEVICE_ID;
 
         // ===== MQTT =====
         function connectMQTT() {
-            client = mqtt.connect(broker, options);
+            const options = {
+                keepalive: 60,
+                clean: true,
+                reconnectPeriod: 1000
+            };
+
+            if (CONFIG.MQTT_USER && CONFIG.MQTT_PASS) {
+                options.username = CONFIG.MQTT_USER;
+                options.password = CONFIG.MQTT_PASS;
+            }
+
+            client = mqtt.connect(CONFIG.MQTT_BROKER, options);
+
             client.on('connect', () => {
-                updateIndicator('mqtt-indicator', 'connected');
-                document.getElementById('mqtt-status').textContent = 'MQTT: Conectado ✓';
-                addEvent('Conectado a broker MQTT', 'info');
-               
-                const subscribeOptions = { qos: 1 };
-               
-                client.subscribe('esp32/sensores/#', subscribeOptions);
-                client.subscribe('esp32/alarmas/#', subscribeOptions);
-                client.subscribe('esp32/system/#', subscribeOptions);
-                client.subscribe('esp32/estado/bomba1', subscribeOptions);
-                client.subscribe('esp32/estado/bomba2', subscribeOptions);
-                client.subscribe('esp32/estado/valvula', subscribeOptions);
-               
-                setTimeout(() => {
-                    client.publish('esp32/control/request_state', '1');
-                }, 500);
+                console.log('✅ MQTT Conectado');
+                updateStatus('connected');
+                
+                // Suscribirse a topics del dispositivo
+                const deviceTopic = `esp32/${CONFIG.DEVICE_ID}`;
+                client.subscribe(`${deviceTopic}/telemetry`);
+                client.subscribe(`${deviceTopic}/status`);
             });
+
             client.on('message', (topic, message) => {
                 const msg = message.toString();
-               
-                switch(topic) {
-                    case 'esp32/sensores/nivel':
-                        const nivel = parseInt(msg);
-                        document.getElementById('nivel-value').textContent = nivel + '%';
-                        updateBar('nivel', nivel);
-                        checkAlarm('nivel', nivel);
-                        break;
-                       
-                    case 'esp32/sensores/presion':
-                        const presion = parseInt(msg);
-                        document.getElementById('presion-value').textContent = presion + '%';
-                        updateBar('presion', presion);
-                        checkAlarm('presion', presion);
-                        break;
-                       
-                    case 'esp32/sensores/puerta':
-                        const puerta = msg === '1';
-                        document.getElementById('puerta-value').textContent = puerta ? 'ABIERTA' : 'CERRADA';
-                        document.getElementById('puerta-value').className = puerta ? 'card-value status-alarm' : 'card-value status-normal';
-                        addEvent(`🚪 Puerta: ${puerta ? 'ABIERTA' : 'CERRADA'}`, puerta ? 'alarm' : 'info');
-                        break;
-                       
-                    case 'esp32/sensores/sensor_nivel':
-                        const sensorNivel = msg === '1';
-                        document.getElementById('sensor-nivel-value').textContent = sensorNivel ? 'ALTO' : 'BAJO';
-                        document.getElementById('sensor-nivel-value').className = sensorNivel ? 'card-value status-normal' : 'card-value status-warning';
-                        addEvent(`📏 Sensor Nivel: ${sensorNivel ? 'ALTO' : 'BAJO'}`, 'info');
-                        break;
-                       
-                    case 'esp32/alarmas/conteo':
-                        document.getElementById('alarm-count').textContent = msg;
-                        break;
-                       
-                    case 'esp32/system/memory':
-                        const memKB = Math.round(parseInt(msg) / 1024);
-                        document.getElementById('memory').textContent = memKB + ' KB';
-                        break;
-                   
-                    case 'esp32/estado/bomba1':
-                        updateBomba1UI(msg === '1');
-                        break;
-                       
-                    case 'esp32/estado/bomba2':
-                        updateBomba2UI(msg === '1');
-                        break;
-                       
-                    case 'esp32/estado/valvula':
-                        updateServoUI(parseInt(msg));
-                        break;
+                console.log(`📨 ${topic}: ${msg}`);
+                
+                try {
+                    const data = JSON.parse(msg);
+                    
+                    // Actualizar sensores
+                    if (data.nivel !== undefined) updateSensor('nivel', data.nivel);
+                    if (data.presion !== undefined) updateSensor('presion', data.presion);
+                    if (data.puerta !== undefined) updateDigital('puerta', data.puerta);
+                    if (data.sensor_nivel !== undefined) updateDigital('sensor-nivel', data.sensor_nivel);
+                    
+                    // Timestamp
+                    document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+                    
+                } catch (e) {
+                    console.error('Error parsing:', e);
                 }
             });
+
             client.on('error', (err) => {
-                updateIndicator('mqtt-indicator', 'disconnected');
-                document.getElementById('mqtt-status').textContent = 'MQTT: Error ✗';
-                addEvent('Error de conexión MQTT', 'alarm');
+                console.error('MQTT Error:', err);
+                updateStatus('disconnected');
             });
-            client.on('reconnect', () => {
-                updateIndicator('mqtt-indicator', 'connecting');
-                document.getElementById('mqtt-status').textContent = 'MQTT: Reconectando...';
+
+            client.on('close', () => {
+                updateStatus('disconnected');
             });
         }
 
-        // ===== UPTIME =====
-        setInterval(() => {
-            const uptime = Math.floor((Date.now() - startTime) / 1000);
-            const hours = Math.floor(uptime / 3600);
-            const minutes = Math.floor((uptime % 3600) / 60);
-            const seconds = uptime % 60;
-           
-            const pad = (n) => String(n).padStart(2, '0');
-            document.getElementById('uptime').textContent = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
-        }, 1000);
+        function updateStatus(status) {
+            const indicator = document.getElementById('mqtt-indicator');
+            const statusText = document.getElementById('mqtt-status');
+            
+            if (status === 'connected') {
+                indicator.className = 'status-indicator connected';
+                statusText.textContent = 'Conectado';
+            } else {
+                indicator.className = 'status-indicator disconnected';
+                statusText.textContent = 'Desconectado';
+            }
+        }
 
+        function updateSensor(sensor, value) {
+            document.getElementById(`${sensor}-value`).textContent = value + '%';
+            document.getElementById(`${sensor}-gauge`).style.width = value + '%';
+            
+            // Alarmas
+            const alarm = CONFIG.ALARMAS[sensor];
+            const alarmEl = document.getElementById(`${sensor}-alarm`);
+            
+            if (value >= alarm.high) {
+                alarmEl.textContent = 'CRÍTICO';
+                alarmEl.className = 'alarm-badge critical';
+            } else if (value <= alarm.low) {
+                alarmEl.textContent = 'BAJO';
+                alarmEl.className = 'alarm-badge warning';
+            } else {
+                alarmEl.textContent = 'Normal';
+                alarmEl.className = 'alarm-badge normal';
+            }
+        }
+
+        function updateDigital(sensor, state) {
+            const el = document.getElementById(`${sensor}-value`);
+            if (sensor === 'puerta') {
+                el.textContent = state ? '🔴 ABIERTA' : '🟢 CERRADA';
+                el.style.color = state ? '#DC143C' : '#4CAF50';
+            } else {
+                el.textContent = state ? '🟢 ALTO' : '🟡 BAJO';
+                el.style.color = state ? '#4CAF50' : '#FFA500';
+            }
+        }
+
+        function toggleBomba1() {
+            bomba1State = !bomba1State;
+            const btn = document.getElementById('bomba1-btn');
+            const text = document.getElementById('bomba1-text');
+            
+            if (bomba1State) {
+                btn.className = 'control-button on';
+                text.textContent = 'APAGAR';
+            } else {
+                btn.className = 'control-button off';
+                text.textContent = 'ENCENDER';
+            }
+            
+            // Publicar comando
+            client.publish(
+                `esp32/${CONFIG.DEVICE_ID}/command`,
+                JSON.stringify({ command: 'bomba1', value: bomba1State ? '1' : '0' })
+            );
+        }
+
+        function toggleBomba2() {
+            bomba2State = !bomba2State;
+            const btn = document.getElementById('bomba2-btn');
+            const text = document.getElementById('bomba2-text');
+            
+            if (bomba2State) {
+                btn.className = 'control-button on';
+                text.textContent = 'APAGAR';
+            } else {
+                btn.className = 'control-button off';
+                text.textContent = 'ENCENDER';
+            }
+            
+            client.publish(
+                `esp32/${CONFIG.DEVICE_ID}/command`,
+                JSON.stringify({ command: 'bomba2', value: bomba2State ? '1' : '0' })
+            );
+        }
+
+        // ===== INICIAR =====
         window.onload = () => {
-            document.getElementById('password-input').focus();
+            connectMQTT();
         };
     </script>
 </body>
