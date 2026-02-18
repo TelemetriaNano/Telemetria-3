@@ -251,35 +251,6 @@
             50% { opacity: 0.6; }
         }
         
-        /* ===== PUSH NOTIFICATIONS BUTTON ===== */
-        .push-notif-btn {
-            padding: 10px 20px;
-            font-size: 14px;
-            font-weight: bold;
-            border: 2px solid;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        .push-notif-btn.disabled {
-            background: #808080;
-            color: white;
-            border-color: #606060;
-            opacity: 0.6;
-        }
-        
-        .push-notif-btn.enabled {
-            background: linear-gradient(135deg, #00AA00, #00CC00);
-            color: white;
-            border-color: #00AA00;
-        }
-        
-        .push-notif-btn:hover:not(.disabled) {
-            box-shadow: 0 0 16px rgba(0, 170, 0, 0.6);
-        }
-        
         /* ===== SILENCE ALL BUTTON ===== */
         .silence-all-btn {
             padding: 12px 24px;
@@ -1034,12 +1005,6 @@
             <div class="status-item">
                 <span>💾 Memoria: <strong id="memory">0 KB</strong></span>
             </div>
-            <!-- ===== BOTÓN PUSH NOTIFICATIONS ===== -->
-            <div class="status-item">
-                <button class="push-notif-btn disabled" id="push-btn" onclick="enablePushNotifications()">
-                    🔔 <span id="push-text">Activar Notificaciones</span>
-                </button>
-            </div>
             <div class="status-item">
                 <button class="silence-all-btn" id="silence-all" onclick="silenceAllAlarms()">
                     🔇 SILENCIAR TODAS
@@ -1222,47 +1187,9 @@
         </div>
     </div>
 
-    <!-- ===== FIREBASE SDK ===== -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
-
     <script>
-        // ===== CONFIGURACIÓN (PRIMERO) =====
+        // ===== CONFIGURACIÓN =====
         const CORRECT_PASSWORD = "Nano01";
-        
-        // ===== CONFIGURACIÓN FIREBASE =====
-        const firebaseConfig = {
-            apiKey: "AIzaSyCCdJ9YirX__bPZEMTP2LwhSKZl2QNCTbU",
-            authDomain: "telemetria-nano-dede4.firebaseapp.com",
-            projectId: "telemetria-nano-dede4",
-            storageBucket: "telemetria-nano-dede4.firebasestorage.app",
-            messagingSenderId: "906041908876",
-            appId: "1:906041908876:web:3cc110596a45ff09e4a5a9"
-        };
-
-        const vapidKey = "BErEPxenFDNg06KldgleXvc5IVotF5WsmZ23GPatkCDa0WvSHVLxkijM7Jd6fc6j9d49L4wbrHOEavsFlq6lRAw";
-
-        // Inicializar Firebase cuando esté disponible
-        let messaging = null;
-        
-        function initFirebase() {
-            if (typeof firebase === 'undefined') {
-                console.error('❌ Firebase no está cargado');
-                return false;
-            }
-            
-            try {
-                firebase.initializeApp(firebaseConfig);
-                messaging = firebase.messaging();
-                console.log('✅ Firebase inicializado correctamente');
-                return true;
-            } catch (error) {
-                console.error('❌ Error inicializando Firebase:', error);
-                return false;
-            }
-        }
-        
-        let pushNotificationsEnabled = false;
         
         // ===== CONFIGURACIÓN MQTT =====
         const broker = "wss://430b579b966d4e73a269ce0c803564a7.s1.eu.hivemq.cloud:8884/mqtt";
@@ -1309,162 +1236,6 @@
             }
         };
         
-        // ===== PUSH NOTIFICATIONS =====
-        async function enablePushNotifications() {
-            try {
-                const btn = document.getElementById('push-btn');
-                const text = document.getElementById('push-text');
-                
-                btn.disabled = true;
-                text.textContent = 'Inicializando...';
-                
-                // Verificar e inicializar Firebase
-                if (!messaging && !initFirebase()) {
-                    throw new Error('Firebase no se pudo inicializar');
-                }
-                
-                text.textContent = 'Solicitando permiso...';
-                
-                const permission = await Notification.requestPermission();
-                
-                if (permission === 'granted') {
-                    // Registrar service worker
-                    await registerServiceWorker();
-                    
-                    text.textContent = 'Obteniendo token...';
-                    
-                    // Obtener token FCM
-                    const token = await messaging.getToken({ vapidKey });
-                    console.log('✅ Token FCM obtenido:', token.substr(0, 30) + '...');
-                    
-                    // Guardar token
-                    localStorage.setItem('fcm_token', token);
-                    
-                    pushNotificationsEnabled = true;
-                    btn.classList.remove('disabled');
-                    btn.classList.add('enabled');
-                    text.textContent = 'Notificaciones Activas ✓';
-                    btn.disabled = false;
-                    
-                    addEvent('🔔 Notificaciones push habilitadas', 'info');
-                    
-                    // Notificación de prueba
-                    showPushNotification('✅ Notificaciones Activadas', 
-                        'Recibirás alertas cuando el tanque esté lleno');
-                        
-                    // Configurar listener de mensajes
-                    messaging.onMessage((payload) => {
-                        console.log('📩 Notificación recibida:', payload);
-                        showPushNotification(payload.notification.title, payload.notification.body);
-                    });
-                } else {
-                    throw new Error('Permiso denegado por el usuario');
-                }
-            } catch (error) {
-                console.error('❌ Error al habilitar notificaciones:', error);
-                const btn = document.getElementById('push-btn');
-                const text = document.getElementById('push-text');
-                text.textContent = 'Error - Reintentar';
-                btn.disabled = false;
-                btn.classList.remove('enabled');
-                btn.classList.add('disabled');
-                addEvent('❌ Error: ' + error.message, 'alarm');
-                
-                let mensaje = 'No se pudieron activar las notificaciones.\n\n';
-                
-                if (error.message.includes('Firebase')) {
-                    mensaje += 'Error: Firebase no se cargó correctamente.\n';
-                    mensaje += 'Verifica tu conexión a internet y recarga la página.';
-                } else if (error.message.includes('denegado')) {
-                    mensaje += 'Permiso denegado.\n';
-                    mensaje += 'Ve a la configuración del navegador y permite las notificaciones para este sitio.';
-                } else {
-                    mensaje += 'Error: ' + error.message + '\n';
-                    mensaje += 'Verifica que estés usando HTTPS o localhost.';
-                }
-                
-                alert(mensaje);
-            }
-        }
-        
-        async function registerServiceWorker() {
-            if ('serviceWorker' in navigator) {
-                // Service Worker inline como Blob
-                const swCode = `
-                    importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
-                    importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
-                    
-                    firebase.initializeApp({
-                        apiKey: "AIzaSyCCdJ9YirX__bPZEMTP2LwhSKZl2QNCTbU",
-                        authDomain: "telemetria-nano-dede4.firebaseapp.com",
-                        projectId: "telemetria-nano-dede4",
-                        storageBucket: "telemetria-nano-dede4.firebasestorage.app",
-                        messagingSenderId: "906041908876",
-                        appId: "1:906041908876:web:3cc110596a45ff09e4a5a9"
-                    });
-                    
-                    const messaging = firebase.messaging();
-                    
-                    messaging.onBackgroundMessage((payload) => {
-                        console.log('Mensaje recibido en segundo plano:', payload);
-                        
-                        const notificationTitle = payload.notification.title || '🏭 SCADA NANO';
-                        const notificationOptions = {
-                            body: payload.notification.body,
-                            icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="75" font-size="75">🏭</text></svg>',
-                            badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="75" font-size="75">🔔</text></svg>',
-                            vibrate: [300, 100, 200, 100, 300],
-                            requireInteraction: true,
-                            tag: 'scada-alarm'
-                        };
-                        
-                        return self.registration.showNotification(notificationTitle, notificationOptions);
-                    });
-                    
-                    self.addEventListener('notificationclick', (event) => {
-                        event.notification.close();
-                        event.waitUntil(
-                            clients.matchAll({ type: 'window', includeUncontrolled: true })
-                                .then((clientList) => {
-                                    for (let client of clientList) {
-                                        if ('focus' in client) return client.focus();
-                                    }
-                                    if (clients.openWindow) return clients.openWindow('/');
-                                })
-                        );
-                    });
-                `;
-                
-                const blob = new Blob([swCode], { type: 'application/javascript' });
-                const swUrl = URL.createObjectURL(blob);
-                
-                const registration = await navigator.serviceWorker.register(swUrl);
-                console.log('✅ Service Worker registrado');
-                return registration;
-            }
-        }
-        
-        function showPushNotification(title, body) {
-            if (!pushNotificationsEnabled) return;
-            
-            if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification(title, {
-                    body: body,
-                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="75" font-size="75">🏭</text></svg>',
-                    badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="75" font-size="75">🔔</text></svg>',
-                    vibrate: [300, 100, 200, 100, 300],
-                    requireInteraction: true,
-                    tag: 'scada-alarm'
-                });
-            }
-        }
-        
-        // Escuchar mensajes en primer plano
-        messaging.onMessage((payload) => {
-            console.log('📩 Notificación recibida:', payload);
-            showPushNotification(payload.notification.title, payload.notification.body);
-        });
-        
         // ===== FUNCIONES ORIGINALES =====
         
         function loadConfigs() {
@@ -1473,32 +1244,6 @@
                 alarmConfigs = JSON.parse(saved);
             }
             updateAllMarkers();
-            
-            // Verificar si ya tiene notificaciones habilitadas
-            if (Notification.permission === 'granted' && localStorage.getItem('fcm_token')) {
-                // Inicializar Firebase
-                if (initFirebase()) {
-                    pushNotificationsEnabled = true;
-                    const btn = document.getElementById('push-btn');
-                    const text = document.getElementById('push-text');
-                    btn.classList.remove('disabled');
-                    btn.classList.add('enabled');
-                    text.textContent = 'Notificaciones Activas ✓';
-                    
-                    // Registrar service worker
-                    registerServiceWorker().catch(err => {
-                        console.error('Error re-registrando SW:', err);
-                    });
-                    
-                    // Configurar listener de mensajes
-                    if (messaging) {
-                        messaging.onMessage((payload) => {
-                            console.log('📩 Notificación recibida:', payload);
-                            showPushNotification(payload.notification.title, payload.notification.body);
-                        });
-                    }
-                }
-            }
         }
         
         function saveConfigs() {
@@ -1576,9 +1321,12 @@
                 alarmType = 'ALTA';
                 addEvent(`🚨 ALARMA ALTA - ${instrument.toUpperCase()}: ${value}% (>= ${config.high}%)`, 'alarm');
                 
-                // ===== ENVIAR NOTIFICACIÓN PUSH (SOLO PARA NIVEL Y ALARMA ALTA) =====
-                if (instrument === 'nivel') {
-                    showPushNotification('🚨 TANQUE LLENO', `Nivel detectado: ${value}%`);
+                // Notificación browser nativa (si está permitido)
+                if (Notification.permission === 'granted') {
+                    new Notification('🚨 TANQUE LLENO', {
+                        body: `Nivel detectado: ${value}%`,
+                        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="75" font-size="75">🏭</text></svg>'
+                    });
                 }
             } else if (value < config.high - 2 && state.high) {
                 state.high = false;
@@ -1844,6 +1592,11 @@
                 loadConfigs();
                 connectMQTT();
                 addEvent('Dashboard iniciado correctamente', 'info');
+                
+                // Solicitar permisos de notificación (nativo del navegador)
+                if (Notification.permission === 'default') {
+                    Notification.requestPermission();
+                }
             } else {
                 document.getElementById('login-error').style.display = 'block';
                 document.getElementById('password-input').value = '';
